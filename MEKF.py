@@ -27,14 +27,25 @@ def Quaternion2Euler(q):
     return euler_angle
 
 def ExpQua(v):
-    q = np.zeros([4], dtype=np.float64)
+    # q = np.zeros([4], dtype=np.float64)
+    
+    # v = v * 2
+    # theta = np.linalg.norm(v, ord=2)
+    # if theta == 0:
+    #     q = np.array([1, 0, 0, 0])
+    # else:
+    #     q[0] = math.cos(theta/2)
+    #     q[1:] = v/theta*math.sin(theta/2) 
 
-    phi = np.linalg.norm(v, ord=2)
-    if phi == 0:
+    q = np.zeros([4], dtype=np.float64)
+    v = v / 2
+    theta = np.linalg.norm(v, ord=2)
+    # if theta == 0:
+    if theta < 1e-4:
         q = np.array([1, 0, 0, 0])
     else:
-        q[0] = math.cos(phi)
-        q[1:] = v/phi*math.sin(phi) 
+        q[0] = math.cos(theta)
+        q[1:] = v/theta*math.sin(theta)
 
     return q
 
@@ -62,7 +73,8 @@ def ExpRot(v):
     s = np.array([[0, -v[2], v[1]],
                   [v[2], 0, -v[0]],
                   [-v[1], v[0], 0]], dtype=np.float64)
-    if normv == 0:
+    # if normv == 0:
+    if normv < 1e-4:
         RotM = np.identity(3)
     else:
         RotM = np.identity(3) + math.sin(normv)/normv*s + (1-math.cos(normv))/normv**2*(s@s)
@@ -78,8 +90,8 @@ def WraptoPi(x):
 
 def LogQua(q):
     norm_qv = np.linalg.norm(q[1:], ord=2)
-    # if abs(q[0]-1) <= 1e-5:
-    if q[0] == 1:
+    if abs(q[0]-1) <= 1e-4:
+    # if q[0] == 1:
         u = np.array([[1],
                       [0],
                       [0]])
@@ -94,15 +106,15 @@ def LogQua(q):
 
 usecols = ['ax(g)', 'ay(g)', 'az(g)', 'wx(deg/s)', 'wy(deg/s)', 'wz(deg/s)', 'AngleX(deg)',
            'AngleY(deg)', 'AngleZ(deg)']
-data_base = pd.read_csv('../data/201217111345.txt', usecols=usecols ,sep=r'\s+')
+data_base = pd.read_csv('../data/201217163204.txt', usecols=usecols ,sep=r'\s+')
 acc_base = data_base.loc[:, ['ax(g)', 'ay(g)', 'az(g)']].values
 omega_base = data_base.loc[:, ['wx(deg/s)', 'wy(deg/s)', 'wz(deg/s)']].values
 angle_base = data_base.loc[:, ['AngleX(deg)', 'AngleY(deg)', 'AngleZ(deg)']].values
 
 dt = 0.01
-Q_angle = 0.001
+Q_angle = 0.005
 # Q_bias = 0.03
-R_measure = 0.1
+R_measure = 10
 
 # Q = np.array([[Q_angle, 0, 0, 0],
 #               [0, Q_angle, 0, 0],
@@ -121,8 +133,8 @@ R_measure = 0.1
 # angle_filter = []
 # for i in range(omega_base.shape[0]-1):
 #     # gx = 0.5*(omega_base[i, 0]+omega_base[i+1, 0])/180*np.pi
-#     # gy = 0.5*(omega_base[i, 1]+omega_base[i+1, 0])/180*np.pi
-#     # gz = 0.5*(omega_base[i, 2]+omega_base[i+1, 0])/180*np.pi
+#     # gy = 0.5*(omega_base[i, 1]+omega_base[i+1, 1])/180*np.pi
+#     # gz = 0.5*(omega_base[i, 2]+omega_base[i+1, 2])/180*np.pi
 #     gx = omega_base[i, 0]/180*np.pi
 #     gy = omega_base[i, 1]/180*np.pi
 #     gz = omega_base[i, 2]/180*np.pi
@@ -167,13 +179,13 @@ q_est = Euler2Quaternion(angle)
 angle_filter = []
 for i in range(omega_base.shape[0]):
     # gx = 0.5*(omega_base[i, 0]+omega_base[i+1, 0])/180*np.pi
-    # gy = 0.5*(omega_base[i, 1]+omega_base[i+1, 0])/180*np.pi
-    # gz = 0.5*(omega_base[i, 2]+omega_base[i+1, 0])/180*np.pi
+    # gy = 0.5*(omega_base[i, 1]+omega_base[i+1, 1])/180*np.pi
+    # gz = 0.5*(omega_base[i, 2]+omega_base[i+1, 2])/180*np.pi
     gx = omega_base[i, 0]/180*np.pi
     gy = omega_base[i, 1]/180*np.pi
     gz = omega_base[i, 2]/180*np.pi
     u = np.array([gx, gy, gz], dtype = np.float64)
-    dq = ExpQua(u*0.5*dt)
+    dq = ExpQua(u*dt)
     q_est = MulQua(q_est, dq)
 
     Phi = ExpRot(u*dt)
@@ -204,6 +216,6 @@ plt.legend(['filter', 'base'])
 
 plt.figure()
 plt.plot(angle_filter[:, 2]/np.pi*180)
-plt.figure()
 plt.plot(angle_base[:, 2])
+plt.legend(['filter', 'base'])
 plt.show()
